@@ -1,16 +1,23 @@
-require 'active_support/concern'
+require 'active_support/concern' if ActiveRecord::VERSION::MAJOR >= 3
 require 'active_support/core_ext/array/extract_options'
 
 module CryptKeeper
   module Model
-    extend ActiveSupport::Concern
 
+    if CryptKeeper.legacy_mode?
+      def self.included(klass)
+        klass.extend(ClassMethods)
+      end
+    else
+      extend ActiveSupport::Concern
+    end
+    
     # Public: Ensures that each field exist and is of type text. This prevents
     # encrypted data from being truncated.
     def ensure_valid_field!(field)
       if self.class.columns_hash["#{field}"].nil?
         raise ArgumentError, "Column :#{field} does not exist"
-      elsif self.class.columns_hash["#{field}"].type != :text
+      elsif ![:text, :string].include?(self.class.columns_hash["#{field}"].type)
         raise ArgumentError, "Column :#{field} must be of type 'text' to be used for encryption"
       end
     end
@@ -92,7 +99,14 @@ module CryptKeeper
 
       # Private: The encryptor class
       def encryptor_klass
-        @encryptor_klass ||= "CryptKeeper::Provider::#{crypt_keeper_encryptor.to_s.camelize}".constantize
+        return @encryptor_klass if @encryptor_klass
+        
+        begin
+          @encryptor_klass = "CryptKeeper::Provider::#{crypt_keeper_encryptor.to_s.camelize}".constantize
+        rescue NameError
+          require "crypt_keeper/provider/#{crypt_keeper_encryptor}"
+          retry
+        end
       end
 
       # Private: Ensure that the encryptor responds to new
@@ -104,6 +118,8 @@ module CryptKeeper
 
       # Private: Define callbacks for encryption
       def define_crypt_keeper_callbacks
+        define_method(:after_find) { }
+        
         after_save :decrypt_callback
         after_find :decrypt_callback
         before_save :encrypt_callback
@@ -111,8 +127,4 @@ module CryptKeeper
       end
     end
   end
-end
-
-ActiveSupport.on_load :active_record do
-  include CryptKeeper::Model
 end

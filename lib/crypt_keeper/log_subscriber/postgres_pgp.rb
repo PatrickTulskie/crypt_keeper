@@ -1,12 +1,13 @@
-require 'active_support/concern'
-require 'active_support/lazy_load_hooks'
+if !CryptKeeper.legacy_mode?
+  require 'active_support/concern'
+  require 'active_support/lazy_load_hooks'
+end
 
 module CryptKeeper
   module LogSubscriber
     module PostgresPgp
-      extend ActiveSupport::Concern
 
-      included do
+      def self.included(klass)
         alias_method_chain :sql, :postgres_pgp
       end
 
@@ -24,6 +25,6 @@ module CryptKeeper
   end
 end
 
-ActiveSupport.on_load :crypt_keeper_posgres_pgp_log do
+if CryptKeeper.legacy_mode?
   ActiveRecord::LogSubscriber.send :include, CryptKeeper::LogSubscriber::PostgresPgp
 end
