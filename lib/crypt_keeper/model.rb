@@ -78,12 +78,12 @@ module CryptKeeper
 
       # Public: Encrypts a string with the encryptor
       def encrypt(value)
-        encryptor.encrypt value
+        encryptor.encrypt(value) unless value.blank?
       end
 
       # Public: Decrypts a string with the encryptor
       def decrypt(value)
-        encryptor.decrypt value
+        encryptor.decrypt(value) unless value.blank?
       end
 
       private
